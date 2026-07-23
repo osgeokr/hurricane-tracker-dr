@@ -86,7 +86,8 @@ footer{position:relative;z-index:10;background:var(--surface);border-top:3px sol
 .handle::after{content:'';position:absolute;left:5px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--flag-red)}
 #rangeshade{position:absolute;top:0;bottom:0;background:rgba(206,17,38,.08);border-left:1px solid rgba(206,17,38,.45);border-right:1px solid rgba(206,17,38,.45);pointer-events:none;z-index:1}
 #playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--gov-blue);z-index:2;pointer-events:none}
-#histlbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-top:3px}
+#histlbl{position:relative;height:1.25em;font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-top:3px}
+#histlbl span{position:absolute;top:0;white-space:nowrap}
 
 @media (max-width:700px){
   footer{flex-wrap:wrap;gap:10px;padding:10px 12px}
@@ -188,7 +189,7 @@ footer{position:relative;z-index:10;background:var(--surface);border-top:3px sol
         <div class="handle" id="hB" title="Range end — drag"></div>
         <div id="playhead"></div>
       </div>
-      <div id="histlbl"><span>1851</span><span>1900</span><span>1950</span><span>2000</span><span>2025</span></div>
+      <div id="histlbl"></div>
     </div>
   </footer>
 </div>
@@ -246,7 +247,7 @@ function resize(){
   BBOX=(W<H)?BBOX_TALL:BBOX_WIDE;
   const dw=(BBOX.e-BBOX.w)*ASPECT,dh=BBOX.n-BBOX.s;
   scale=Math.min(W/dw,H/dh);ox=(W-dw*scale)/2;oy=(H-dh*scale)/2;
-  drawHist();updateBarUI();draw();
+  drawHist();placeYearLabels();updateBarUI();draw();
 }
 function px(lon,lat){return[ox+(lon-BBOX.w)*ASPECT*scale,oy+(BBOX.n-lat)*scale];}
 addEventListener('resize',resize);
@@ -486,6 +487,13 @@ function drawHist(){
     hctx.fillRect(i*bw+.5,HH-h,Math.max(bw-1,1),h);
   });
   hctx.globalAlpha=1;
+  // vertical gridlines at every labelled year mark, aligned to the labels below
+  hctx.strokeStyle='rgba(15,42,74,.20)';hctx.lineWidth=1;
+  const gm=yearMarks();
+  for(let k=1;k<gm.length-1;k++){
+    const gx=Math.round((gm[k]-Y0+0.5)/NY*r.width)+0.5;
+    hctx.beginPath();hctx.moveTo(gx,0);hctx.lineTo(gx,HH);hctx.stroke();
+  }
   const i=YEARS.indexOf(curYear);
   hctx.strokeStyle=css('--gov-blue');hctx.lineWidth=1.5;
   hctx.strokeRect(i*bw,.75,Math.max(bw,2),HH-1.5);
@@ -665,7 +673,28 @@ function frame(now){
   draw();
   requestAnimationFrame(frame);
 }
-resize();setYear(2025);requestAnimationFrame(()=>{resize();});requestAnimationFrame(frame);
+function yearMarks(){
+  const w=bar.getBoundingClientRect().width;
+  const pxPerYear=w/(Y1-Y0);
+  // widen the interval when space is tight so labels never overlap
+  const interval=pxPerYear*25>=52?25:pxPerYear*50>=52?50:75;
+  const marks=[Y0];
+  const first=Math.ceil((Y0+1)/interval)*interval;
+  for(let y=first;y<Y1;y+=interval)marks.push(y);
+  marks.push(Y1);
+  return marks;
+}
+function placeYearLabels(){
+  const lbl=document.getElementById('histlbl');lbl.innerHTML='';
+  const marks=yearMarks();
+  marks.forEach((y,idx)=>{
+    const s=document.createElement('span');s.textContent=y;
+    s.style.left=((y-Y0+0.5)/NY*100)+'%';           // bar-centre, matches drawHist()
+    s.style.transform=idx===0?'translateX(0)':idx===marks.length-1?'translateX(-100%)':'translateX(-50%)';
+    lbl.appendChild(s);
+  });
+}
+placeYearLabels();resize();setYear(2025);requestAnimationFrame(()=>{resize();});requestAnimationFrame(frame);
 </script>
 </body>
 </html>
